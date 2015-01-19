@@ -1,0 +1,1 @@
+# angular-indexedDB-promise
