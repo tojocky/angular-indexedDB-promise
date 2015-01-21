@@ -1,0 +1,28 @@
+{
+  "name": "angular-indexedDB-promise",
+  "version": "0.0.0",
+  "homepage": "https://github.com/tojocky/angular-indexedDB-promise",
+  "authors": [
+    "Ion Lupascu <ionlupascu@gmail.com>"
+  ],
+  "description": "indexedDB for AngularJS",
+  "moduleType": [
+    "amd",
+    "globals"
+  ],
+  "keywords": [
+    "indexedDB",
+    "DB",
+    "angular.JS",
+    "angularJS",
+    "NoSQL"
+  ],
+  "license": "MIT",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ]
+}
