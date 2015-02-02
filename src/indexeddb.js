@@ -1,6 +1,6 @@
 (function() {
     'use strict';
-    angular.module('ilu.indexedDB', []).provider('$indexedDB', function() {
+    angular.module('ilu.indexedDB', []).provider('$indexedDBPromise', function() {
         var module = this,
             connectionConfigs = {},
             defaultConnectionName = '',
@@ -38,6 +38,7 @@
 
             this.name = dbName;
             this.versions = {};
+            this.versionNumbers = [];
             this.maxVersion = 1;
 
             if(!defaultConnectionName || isDefault) {
@@ -59,6 +60,8 @@
 
             if(!this.versions[version]) {
                 this.versions[version] = [];
+                this.versionNumbers.push(version);
+                this.versionNumbers.sort();
             }
 
             this.maxVersion = Math.max(this.maxVersion, newVersion);
@@ -135,7 +138,8 @@
                 dbConnections[dbName].push(dfd.promise);
                 dfd.promise.db = {};
                 dfd.promise.db.config = connectionConfigs[dbName] || {};
-                dfd.promise.db.connection = indexedDB.open(dbName, dfd.promise.db.config.maxVersion || 1);
+                dfd.promise.db.version = dfd.promise.db.config.maxVersion || 1;
+                dfd.promise.db.connection = indexedDB.open(dbName, dfd.promise.db.version);
                 dfd.promise.db.connection.onsuccess = function() {
                     db = dfd.promise.db.connection.result;
                     $rootScope.$apply(function() {
@@ -145,16 +149,48 @@
 
                 dfd.promise.db.connection.onblocked = dfd.promise.db.connection.onerror = rejectWithError(dfd);
 
-                dfd.promise.db.connection..onupgradeneeded = function(event) {
+                dfd.promise.db.connection.onupgradeneeded = function(event) {
                     var tx;
-                    db = event.target.result;
-                    tx = event.target.transaction;
-                    $log.debug("$indexedDB: Upgrading database '" + db.name + "' from version " + event.oldVersion + " to version " + event.newVersion + " ...");
-                    applyNeededUpgrades(event.oldVersion, event, db, tx);
+                    var db = dfd.promise.db.db = event.target.result;
+                    var tx = dfd.promise.db.transaction = event.target.transaction;
+                    $log.debug("$indexedDBPromise: Upgrading database '" + db.name + "' from version " + event.oldVersion + " to version " + event.newVersion + " ...");
+                    applyNeededUpgrades(event.oldVersion, event, dfd.promise);
                 }
+
+                dfd.promise.createObjectStore = function() {
+                    return dfd.promise.db.db.createObjectStore.apply(dfd.promise.db.db, arguments);
+                }
+
+                dfd.promise.close = function() {
+                    return dfd.promise.then(function() {
+
+                        dfd.promise.db.db.close();
+                        return dbPromise = null;
+                    });
+                };
 
                 return dfd.promise;
             }
+
+            function applyNeededUpgrades(oldVersion, event, dbPromise) {
+                var i,
+                    versionNumbers = dbPromise.db.config.versionNumbers,
+                    versions = dbPromise.db.config.versions;
+                for (var i = 0; i < versionNumbers.length ; ++ i) {
+                    var versionNumber = versionNumbers[i],
+                        versionCallbacks =  versions[versionNumber],
+                        j;
+                    // skip old versions
+                    if(oldVersion >= versionNumber) {
+                        continue;
+                    }
+
+                    for(j = 0; j < versionCallbacks.length; ++j) {
+                        versionCallbacks[j](event, dbPromise);
+                    }
+                }
+            }
+
             function rejectWithError(deferred) {
                 return function(error) {
                     return $rootScope.$apply(function() {
